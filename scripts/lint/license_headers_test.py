@@ -90,6 +90,28 @@ class LicenseHeadersTest(unittest.TestCase):
         self.assertIn("Copyright (c)", updated)
         self.assertIn("SPDX-License-Identifier: Apache-2.0", updated)
 
+    def test_path_in_scope_ignores_outside_root(self) -> None:
+        with tempfile.TemporaryDirectory() as outside:
+            outside_path = pathlib.Path(outside) / "external.go"
+            outside_path.write_text("package external\n", encoding="utf-8")
+            self.assertFalse(lh._path_in_scope(outside_path))
+
+    def test_iter_source_files_prunes_excluded_dirs(self) -> None:
+        included = self._write_file("cmd/jaeger/config.yaml", "service:\n")
+        self._write_file("vendor/example/config.yaml", "name: vendor\n")
+        self._write_file("jaeger-ui/src/index.ts", "const x = 1;\n")
+        self._write_file("internal/tools/tool.py", "print('x')\n")
+        self._write_file("foo/mocks/bar.go", "package mocks\n")
+
+        paths = lh._iter_source_files()
+        rel_paths = {p.relative_to(self._root).as_posix() for p in paths}
+
+        self.assertIn(included.relative_to(self._root).as_posix(), rel_paths)
+        self.assertNotIn("vendor/example/config.yaml", rel_paths)
+        self.assertNotIn("jaeger-ui/src/index.ts", rel_paths)
+        self.assertNotIn("internal/tools/tool.py", rel_paths)
+        self.assertNotIn("foo/mocks/bar.go", rel_paths)
+
 
 if __name__ == "__main__":
     unittest.main()

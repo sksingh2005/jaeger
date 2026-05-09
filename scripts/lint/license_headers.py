@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import re
 import sys
@@ -52,9 +53,22 @@ SPDX_RE = re.compile(r"SPDX-License-Identifier:\s*Apache-2\.0", re.IGNORECASE)
 SHEBANG_RE = re.compile(r"^#!\s*/\S+")
 
 
+def _resolve_path(path: pathlib.Path) -> pathlib.Path:
+    try:
+        return path.resolve(strict=False)
+    except OSError:
+        return path
+
+
 def _path_in_scope(path: pathlib.Path) -> bool:
-    rel = path.relative_to(ROOT).as_posix()
-    name = path.name
+    resolved = _resolve_path(path)
+    try:
+        rel = resolved.relative_to(ROOT)
+    except ValueError:
+        # Explicit args may include absolute or ../ paths outside repo root.
+        return False
+
+    name = resolved.name
 
     if name.startswith(EXCLUDED_FILE_PREFIXES):
         return False
@@ -62,12 +76,15 @@ def _path_in_scope(path: pathlib.Path) -> bool:
         return False
     if name.startswith("mocks"):
         return False
-    rel_wrapped = f"/{rel}/"
+
+    rel_posix = rel.as_posix()
+    rel_wrapped = f"/{rel_posix}/"
     if any(fragment in rel_wrapped for fragment in EXCLUDED_PATH_FRAGMENTS):
         return False
-    if any(part in EXCLUDED_DIR_PARTS for part in path.parts):
+    if any(part in EXCLUDED_DIR_PARTS for part in rel.parts):
         return False
-    if path.suffix in SCOPE_EXTENSIONS:
+
+    if resolved.suffix in SCOPE_EXTENSIONS:
         return True
     if any(name.startswith(prefix) for prefix in SCOPE_PREFIX_FILENAMES):
         return True
@@ -146,7 +163,12 @@ def _update_file(path: pathlib.Path, check_only: bool) -> bool:
 
     idx = _insertion_index(new_lines)
 
-    if idx > 0 and idx < len(new_lines) and new_lines[idx - 1].strip() and new_lines[idx].strip():
+    if (
+        idx > 0
+        and idx < len(new_lines)
+        and new_lines[idx - 1].strip()
+        and new_lines[idx].strip()
+    ):
         new_lines.insert(idx, "\n")
         idx += 1
 
@@ -157,13 +179,37 @@ def _update_file(path: pathlib.Path, check_only: bool) -> bool:
     return True
 
 
+def _should_skip_dir(rel_dir: pathlib.Path, dirname: str) -> bool:
+    if dirname in EXCLUDED_DIR_PARTS:
+        return True
+    if dirname.startswith(EXCLUDED_FILE_PREFIXES):
+        return True
+    if dirname.startswith("mocks"):
+        return True
+
+    candidate = (rel_dir / dirname).as_posix()
+    wrapped = f"/{candidate}/"
+    return any(fragment in wrapped for fragment in EXCLUDED_PATH_FRAGMENTS)
+
+
 def _iter_source_files() -> list[pathlib.Path]:
     paths: list[pathlib.Path] = []
-    for path in ROOT.rglob("*"):
-        if not path.is_file():
-            continue
-        if _path_in_scope(path):
-            paths.append(path)
+
+    for dirpath, dirnames, filenames in os.walk(ROOT):
+        current_dir = pathlib.Path(dirpath)
+        rel_dir = current_dir.relative_to(ROOT)
+
+        dirnames[:] = [
+            dirname
+            for dirname in dirnames
+            if not _should_skip_dir(rel_dir, dirname)
+        ]
+
+        for filename in filenames:
+            path = current_dir / filename
+            if path.is_file() and _path_in_scope(path):
+                paths.append(path)
+
     return sorted(paths)
 
 
@@ -184,7 +230,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.files:
-        files = [ROOT / f for f in args.files]
+        files = [pathlib.Path(f) if pathlib.Path(f).is_absolute() else ROOT / f for f in args.files]
     else:
         files = _iter_source_files()
 
