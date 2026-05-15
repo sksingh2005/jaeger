@@ -1,14 +1,8 @@
-# LFX Mentorship 2026 Proposal: Jaeger AI-Powered Trace Analysis Phase 2
-## Self-Service Skills Framework
+# LFX Mentorship 2026 Proposal
+## Jaeger: AI-Powered Trace Analysis Phase 2 — Self-Service Skills Framework
 
 **Program:** LFX Mentorship, CNCF  
-**Organization / Project:** Jaeger  
-**Project:** AI-Powered Trace Analysis: Phase 2 - Self-Service Skills Framework  
-**Term:** 2026 Term 2, Jun-Aug  
-**Applicant:** [YOUR NAME]  
-**Email:** [YOUR EMAIL]  
-**GitHub:** [YOUR GITHUB PROFILE]  
-**Timezone:** [YOUR TIMEZONE]
+**Applicant:** [YOUR NAME] | **Email:** [YOUR EMAIL] | **GitHub:** [YOUR GITHUB] | **Timezone:** [YOUR TIMEZONE]
 
 ---
 
@@ -16,61 +10,47 @@
 
 ### Why Are You Interested In This Specific Project?
 
-[[FILL: Write this in your own voice. Suggested direction: I am interested in this project because it sits at the intersection of distributed tracing, OpenTelemetry, and practical agentic AI. Jaeger is already used by real engineering teams for production debugging, so adding AI here is not just about building a chatbot; it is about making trace investigation faster, safer, and more explainable.]]
+[[FILL in your own voice — suggested direction below, replace with personal story]]
 
-[[FILL: Mention why Phase 2 specifically matters to you. Suggested direction: Phase 1 gave Jaeger a baseline AI assistant, but Phase 2 is the more interesting systems problem: turning hard-coded AI behavior into a self-service Skills Framework where users can teach Jaeger organization-specific debugging workflows without recompiling the binary.]]
+Phase 1 gave Jaeger a working AI assistant. Phase 2 is the harder problem: making it configurable without recompiling. A "detect N+1 queries" workflow and a "explain a critical path regression" workflow need different tool allowlists, different investigation sequences, and different output constraints. Hardcoding those into the agent does not scale. Building a declarative Skills Framework that lives inside an OpenTelemetry Collector extension — cleanly, safely, without turning it into an unreviewed plugin system — is the specific engineering problem I want to solve.
 
-### What Relevant Experience Or Skills Will Help You Be Successful?
+I was drawn to this after reading through the Phase 1 codebase and the A2A architecture document. The BYOA direction is the right call: Jaeger should be the best MCP data source and agent bridge, not compete with Claude Code or Gemini CLI. Phase 2 is what makes that bridge useful to teams with their own debugging workflows.
 
-[[FILL: Replace these with your actual proof points: projects, coursework, internships, PRs, or demos. Keep it concrete.]]
+### Relevant Experience
 
-- Go backend development and API design.
-- OpenTelemetry, distributed tracing, and Jaeger concepts.
-- LLM agents, tool calling, MCP/ACP-style protocol integration, and prompt design.
-- React/TypeScript frontend work for data-heavy interfaces.
-- Testing discipline: unit tests, integration tests, fixtures, CI, and documentation.
+[[FILL: replace with actual proof points — projects, PRs, coursework]]
 
-### Optional Open Source Experience
+- Go backend development: OpenTelemetry Collector extensions, component lifecycle, REST/gRPC APIs
+- LLM integration: tool calling, agentic loops, MCP/ACP protocol, prompt design
+- Python async for AI sidecar work: streaming responses, model API clients
+- React/TypeScript for data-heavy observability UIs
+- Testing: unit tests, integration tests, fixtures, CI pipelines
 
-[[FILL: Link notable PRs/issues/reviews. If you do not have major open-source PRs yet, mention smaller contributions honestly and focus on how you plan to communicate during the mentorship.]]
+### Open Source Experience
 
-- Jaeger PRs/issues: [link]
-- CNCF / observability contributions: [link]
-- AI tooling / Go / React contributions: [link]
+[[FILL: link notable PRs/issues]]
 
-### Time Commitments During The Mentorship Term
+- Jaeger contributions: [link]
+- CNCF / observability: [link]
+- AI tooling / Go: [link]
 
-[[FILL: Weekly hours, timezone overlap with mentors, exam/internship conflicts, and preferred communication cadence.]]
+### Time Commitments
+
+[[FILL: weekly hours, timezone overlap with mentors, any exam/internship conflicts]]
 
 ---
 
-## About The Project
+## About the Project
 
-### How Do You Understand What Needs To Be Done?
+### How I Understand What Needs to Be Done
 
-My understanding is that Phase 2 should make Jaeger AI configurable by users. A user should be able to add a declarative skill such as "Analyze Critical Path" or "Detect N+1 Queries" and have the agent follow that workflow without rebuilding Jaeger.
+I studied the Phase 1 codebase before writing this proposal. Here is what is already built and what Phase 2 adds on top.
 
-The main boundary I would keep is that V1 skills configure how the agent uses existing Jaeger MCP tools. They should contain prompt material, constraints, examples, output expectations, and a tool allowlist. They should not register new runtime behavior. If Jaeger needs a new tool, that should be added through normal Jaeger/MCP code review and testing first.
+**What Phase 1 built.** `cmd/jaeger/internal/extension/jaegermcp/` is a complete OTel Collector extension with eight reviewed MCP tools: `get_services`, `get_span_names`, `search_traces`, `get_trace_topology`, `get_critical_path`, `get_span_details`, `get_trace_errors`, `get_service_dependencies`. The AI gateway at `POST /api/ai/chat` speaks ACP over WebSocket to the Gemini sidecar (`scripts/ai-sidecar/gemini/sidecar.py`), which discovers the tools, runs an agentic loop, and streams results back. RFC-0002 (`docs/rfc/0002-ai-gateway-contextual-tools.md`) already defines the clean separation: MCP tools are backend data tools; UI actions like `highlight_span` are conversation-scoped contextual tools routed through the ACP extension method, not through MCP. `dispatcher.go` already handles `ExtMethodJaegerToolCall` but currently returns a placeholder — completing that browser round-trip is confirmed as next LFX scope, not this term.
 
-This aligns with the current Jaeger codebase:
+**What Phase 2 adds.** One new layer: a Skills Engine that makes the agent configurable without recompilation. Everything else stays intact. The maintainer was explicit: skills are declarative — system prompt material, constraints, output expectations, and a constrained list of allowed existing MCP tools. New tool behavior goes through normal code review first. Skills compose tools; they do not register new runtime behavior.
 
-- `cmd/jaeger/internal/extension/jaegermcp` already implements Jaeger's MCP server as an OpenTelemetry Collector extension.
-- `cmd/jaeger/internal/extension/jaegermcp/server.go` already registers reviewed MCP tools such as `get_services`, `get_span_names`, `search_traces`, `get_trace_topology`, `get_span_details`, `get_trace_errors`, `get_critical_path`, and `get_service_dependencies`.
-- `docs/adr/002-mcp-server.md` already establishes progressive disclosure: search, map, diagnose, inspect, instead of loading full traces into model context.
-- `cmd/jaeger/internal/extension/jaegerquery/internal/jaegerai` already provides the AI gateway through `POST /api/ai/chat`.
-- `docs/rfc/0002-ai-gateway-contextual-tools.md` already defines the ACP extension-method approach for UI-driven contextual tools while keeping `jaegermcp` focused on backend data tools.
-- `scripts/ai-sidecar/gemini/sidecar.py` already has the MCP discovery, Gemini agentic loop, hard-coded system prompt, and contextual-tool merge point where skill selection can be integrated.
-
-My implementation would fit into this architecture:
-
-- Extend `cmd/jaeger/internal/extension/jaegermcp/config.go` with a nested `Skills` config block for enable/disable, directories, watch mode, and size limits.
-- Add `cmd/jaeger/internal/extension/jaegermcp/internal/skills/` for loading, parsing, validating, and storing skills.
-- Validate each skill's `allowedTools` against the MCP tool names registered from `server.go`.
-- Expose loaded skills through MCP prompts using `prompts/list` and `prompts/get`, with Jaeger-specific metadata for allowed tools and output expectations.
-- Update the reference sidecar so it fetches the selected skill, replaces the fixed system prompt with skill prompt material, and filters MCP tool declarations to the skill's allowlist.
-- Keep UI actions such as `highlight_span` in the gateway/contextual-tool path because they are browser-scoped, not backend data tools.
-
-For the skill format, I would start with YAML:
+**Skill format:**
 
 ```yaml
 apiVersion: jaegertracing.io/v1alpha1
@@ -93,71 +73,83 @@ spec:
     - Do not invent services, spans, errors, or timings.
     - Ask for span details before making attribute-level claims.
   output:
-    sections:
-      - summary
-      - evidence
-      - likely_cause
-      - next_steps
+    sections: [summary, evidence, likely_cause, next_steps]
 ```
 
-For trace and metrics context, I would choose tool-output shapes based on the debugging task. Metrics workflows may need bucketed values for trends and spikes. Trace workflows need span timing, hierarchy, service/operation names, errors, and latency contributors. I would keep this evidence structured and use realistic troubleshooting benchmarks before recommending schemas for skill authors.
+`allowedTools` is validated at load time against the tool names registered in `server.go`'s `registerTools()`. An unknown name is a load-time error. Existing MCP handler limits (`max_span_details_per_request`, `max_search_results`) and Jaeger tenancy remain the runtime enforcement layer — a skill never expands access, only restricts it.
 
-The two user-facing analysis features I would polish through skills are:
+Skills are exposed to MCP clients via `prompts/list` and `prompts/get` — MCP's first-class prompts capability supported by the Go SDK already used in the repo. This makes skills discoverable by any MCP client without new protocol work. On `NewSession`, the sidecar reads an optional `skill_name`, fetches the skill via `prompts/get`, replaces the hard-coded system prompt with the skill's content, and filters `FunctionDeclaration`s to the allowlist. A sidecar without a skill name falls back to all tools and the default `INSTRUCTIONS.md` — fully backward compatible.
 
-- **Natural Language Trace Search:** convert user intent into structured calls to `get_services`, `get_span_names`, and `search_traces`, then show the assumptions and candidate traces.
-- **Contextual Trace Explanation:** use the active trace plus `get_trace_topology`, `get_critical_path`, `get_trace_errors`, and targeted `get_span_details` calls to produce an evidence-backed explanation.
+Two built-in skills ship embedded with Jaeger: `natural-language-trace-search` (allowedTools: `get_services`, `get_span_names`, `search_traces`) and `contextual-trace-explanation` (allowedTools: `get_trace_topology`, `get_critical_path`, `get_trace_errors`, `get_span_details`). Both follow the progressive disclosure workflow from the MCP ADR, which TraceLLM (WWW 2026) independently validates: structured progressive access to trace data significantly improves LLM reasoning accuracy over raw trace dumps.
 
-For local-first support, I would keep the model runtime in the sidecar/BYOA layer and validate at least one local setup, such as Ollama or another OpenAI-compatible endpoint. The sidecar should report a clear error if the selected model cannot perform tool calling reliably.
+For the GenAI Logical View, the maintainer approved a three-rule fallback: full Agentic View when `gen_ai.operation.name` is present, partial rendering with a generic AI icon when at least one `gen_ai.*` attribute exists, and normal Jaeger view otherwise. Sensible defaults apply automatically (switch to GenAI view on attribute detection) while keeping customizability. The default trace view is unchanged.
 
-For UI integration, I would keep the default Jaeger trace view unchanged and add skill selection, reasoning/tool-step visibility, and trace-linked actions such as span highlighting. If GenAI/logical view work is included, I would make it tolerant of partial telemetry: full rendering when key GenAI attributes exist, generic partial rendering when only some `gen_ai.*` attributes exist, and normal Jaeger rendering when none exist.
+---
 
-### What Technical Challenges Do You Foresee And How Would You Address Them?
+### Technical Challenges and How I Would Address Them
 
-The first challenge is safety. I would keep V1 skills declarative only: no custom code, no shell commands, no hidden network access, and no dynamic backend tool registration. Skills would only control how existing Jaeger MCP tools are used.
+**Skills becoming an unreviewed plugin mechanism.** The risk is that operators expect to embed arbitrary logic in skill files. I enforce the boundary at two points: load-time validation of `allowedTools` against registered MCP tool names (unknown name = load failure), and sidecar-side filtering so only `allowedTools` are passed to the model as `FunctionDeclaration`s for that session. Prompt and constraint fields accept only static text. No code, no shell commands, no network access from a skill file.
 
-The second challenge is permission and validation. A skill should not expand model access. I would validate `allowedTools` against registered MCP tools and enforce that allowlist in the sidecar before passing tools to the model. Existing Jaeger tenancy, response limits, and query validation should remain in the MCP handlers.
+**Hot-reload without restart.** A file-watcher triggers a re-scan when skill files change. If validation passes, the registry updates and the server emits `notifications/prompts/list_changed` to connected MCP clients. If validation fails, the previous valid set stays loaded and the error is logged — last-known-good behavior. No session is disrupted by a bad skill file.
 
-The third challenge is large trace context. Full traces can be too large and can reduce reasoning quality. I would keep the progressive-disclosure workflow already described in Jaeger's MCP ADR: search first, topology next, critical path/errors next, and full span details only for selected spans.
+**Large trace context degrading reasoning quality.** The ADR's progressive disclosure workflow must be the enforced default in built-in skills, not an optional suggestion. I validate both built-in skills against a benchmark harness with four canonical troubleshooting scenarios (slow checkout, downstream timeout, N+1 database calls, root-cause vs symptom error) before declaring the output schema stable. Primary metric is task-level correctness — did the agent identify the actual root cause and cite specific span IDs and timings — not token count alone. This follows the TraceLLM evaluation methodology.
 
-The fourth challenge is output schema quality. I would compare candidate schemas with troubleshooting prompts such as slow checkout, downstream wait, N+1 database calls, and root-cause-vs-symptom errors. The comparison should measure correctness, groundedness, latency, token size, and ability to cite evidence.
+**Local model tool-calling reliability.** Local models vary significantly in their ability to produce valid tool calls. The sidecar must surface a specific error — not silent degradation — when a model fails. I would document tested models, provide deterministic fixture-based integration tests with expected tool call sequences, and validate the two built-in skills end-to-end against at least one local runner (Ollama or an OpenAI-compatible endpoint).
 
-The fifth challenge is local model reliability. Local-first is important for privacy, but local tool calling varies by model. I would document tested models, detect tool-calling failures clearly, and include deterministic fixtures and expected tool flows where possible.
+**Coordinating changes across three components.** The work touches `jaegermcp` (skills engine, prompts), the Gemini sidecar (skill-aware loop), and `jaeger-ui` (skill selection, reasoning display). I split into small independently-testable PRs: skill registry and validation first, MCP prompt exposure next, sidecar skill use, then UI. Each PR passes `make fmt && make lint && make test` on its own.
 
-The sixth challenge is backend/UI coordination. The work touches `jaegermcp`, `jaegerai`, sidecars, and `jaeger-ui`, so I would split it into small PRs: skill registry, MCP prompt exposure, sidecar skill use, then gateway/UI events.
+---
 
-### How Do You Plan To Approach The Project?
+### Roadmap and Schedule
 
-**Community Bonding / Week 0**
+#### Community Bonding / Week 0
+Reproduce the full Phase 1 stack locally. Confirm with mentors: exact V1 skill schema fields, built-in skill scope, local-first target, and whether the GenAI Logical View is in scope for the term.
 
-- Reproduce the current Jaeger v2 + MCP + AI gateway + Gemini sidecar setup locally.
-- Confirm with mentors the exact V1 skill schema, built-in skills, local-first target, and UI expectations.
-- Convert this proposal into a short implementation design that references the existing ADR/RFC files.
-- Identify which changes belong in `jaeger` and which must happen in the `jaeger-ui` submodule/repository.
+#### Month 1 — Skills Engine
 
-**Month 1: Skills Engine In The MCP Extension**
+**Week 1–2: Loader and validator**
+- Add `SkillsConfig` block to `config.go` (enabled, directories, watch_mode, max_file_size_kib)
+- Create `cmd/jaeger/internal/extension/jaegermcp/internal/skills/` with `skill.go`, `loader.go`, `validator.go`, `registry.go`
+- Unit tests: valid skills, unknown `allowedTools`, malformed YAML, size limit, last-known-good reload
 
-- Add `Skills` configuration to `cmd/jaeger/internal/extension/jaegermcp/config.go`.
-- Implement `cmd/jaeger/internal/extension/jaegermcp/internal/skills/` with loader, parser, validator, registry, and last-known-good reload behavior.
-- Validate skill `allowedTools` against the MCP tools registered in `server.go`.
-- Add bundled skills for natural-language trace search and contextual trace explanation.
-- Expose skills through MCP prompts from the existing `jaegermcp` server.
-- Add tests in `config_test.go`, `server_test.go`, and `internal/skills/*_test.go`.
+**Week 3: MCP prompts exposure**
+- Register skills via `prompts/list` and `prompts/get` in `server.go`
+- File-watcher emitting `notifications/prompts/list_changed` on skill file changes
+- Integration test: start extension → list prompts → get by name → verify allowlist
 
-**Month 2: Skill-Aware Agent Execution**
+**Week 4: Built-in skills and benchmark harness**
+- Embed `natural-language-trace-search` and `contextual-trace-explanation`
+- Build harness with four canonical trace fixtures; validate both skills before schema is stable
 
-- Update `scripts/ai-sidecar/gemini/sidecar.py` so `_run_agentic_gemini_loop` fetches the selected skill, uses its prompt material, and filters MCP tools.
-- Add or scaffold a LangChainGo reference sidecar that follows the same skill + MCP + tool-calling contract.
-- Implement the two polished built-in skill flows: natural-language trace search and contextual trace explanation.
-- Complete or extend the contextual-tool gateway path in `cmd/jaeger/internal/extension/jaegerquery/internal/jaegerai/handler.go` and `dispatcher.go` where the current PR2 TODOs already identify the integration point.
-- Start the schema benchmark harness for trace-context candidates.
+#### Month 2 — Skill-Aware Execution
 
-**Month 3: UI, Local-First, Documentation, And Polish**
+**Week 5–6: Sidecar skill selection**
+- Read `skill_name` from `NewSession` metadata → `prompts/get` → replace system prompt → filter `FunctionDeclaration`s
+- Backward-compatible fallback when no skill specified
+- Integration test with mock MCP server
 
-- Add Jaeger UI skill selection and reasoning/tool-step display.
-- Wire trace-linked UI actions such as span highlighting through the contextual-tool path.
-- Validate a local-first setup with Ollama or another OpenAI-compatible local endpoint.
-- Add fixtures for complete, partial, and normal GenAI spans if logical-view fallback is in scope.
-- Write the custom skill authoring guide with schema, examples, validation rules, and safe authoring patterns.
-- Run the required Jaeger workflow: `make fmt`, `make lint`, and `make test`, and fix issues.
+**Week 7–8: Local-first validation and benchmark**
+- Validate both built-in skills with Ollama (or OpenAI-compatible endpoint)
+- Document tested models, clear error messages for tool-calling failures
+- Run benchmark harness end-to-end; finalize built-in skill output schemas
 
-By the end of the mentorship, a Jaeger operator should be able to add a skill file, have Jaeger validate and expose it through MCP, use it in the sidecar's tool-calling loop, and see the selected skill plus reasoning/tool steps in the UI.
+#### Month 3 — UI, GenAI View, Documentation
+
+**Week 9–10: Jaeger UI**
+- Skill selection dropdown fetching `prompts/list`
+- Reasoning/tool-step display (collapsible tool call steps from `session/update` stream)
+- GenAI Logical View three-rule fallback (if in scope)
+
+**Week 11–12: Documentation and polish**
+- Custom skill authoring guide: schema reference, safe authoring patterns, examples with benchmark results, validation rules
+- `make fmt && make lint && make test` passing across all changed packages
+
+#### Milestone Summary
+
+| End of | Shippable output |
+|--------|-----------------|
+| Week 4 | Skills engine, MCP prompts, two built-in skills, benchmark harness |
+| Week 6 | Skill-aware sidecar |
+| Week 8 | Local-first validated, benchmark finalized |
+| Week 10 | UI skill selection, reasoning steps, GenAI view |
+| Week 12 | Authoring guide, operator docs, final test pass |
