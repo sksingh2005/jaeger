@@ -1,0 +1,76 @@
+flowchart TD
+    ATTRS["span.attributes: IAttribute[]\nalready converted from tags by OtelSpanFacade"]
+
+    subgraph MODEL["packages/jaeger-ui/src/model/"]
+        ATTRS_CONST["model/genai/attributes.ts\ngen_ai.* attribute name constants"]
+        CLASSIFY["model/genai/classify-span.ts\npure classifyGenAISpan(attributes)"]
+        SPAN_FAC["OtelSpanFacade.ts\ngenAIKind: GenAISpanKind\ncached alongside _kind · _status · _parentSpanID"]
+        TRACE_FAC["OtelTraceFacade.ts\ngenAIMode: 'full' | 'partial' | 'none'\nderived by scanning this.spans once"]
+    end
+
+    subgraph TYPES["types/"]
+        IOTEL_SPAN["IOtelSpan\n+ genAIKind: GenAISpanKind"]
+        IOTEL_TRACE["IOtelTrace\n+ genAIMode: 'full' | 'partial' | 'none'"]
+    end
+
+    subgraph HEADER["TracePage/TracePageHeader/"]
+        HEADER_COMP["TracePageHeader.tsx\nmode indicator badge"]
+        SETTINGS["TraceViewSettings.tsx\nLogical View menu item\n(3rd item in existing settings gear)"]
+    end
+
+    subgraph REDUX["TTraceTimeline / duck.ts"]
+        STATE["logicalViewEnabled: boolean\nalongside detailPanelMode · timelineVisible"]
+        ACTION["SET_LOGICAL_VIEW action + reducer\nlocalStorage persistence"]
+    end
+
+    subgraph TIMELINE["TraceTimelineViewer/"]
+        VIRT["VirtualizedTraceView.tsx\nreads logicalViewEnabled from Redux"]
+        ROWS["generateRowStates.ts\nbuildVisibleRows(..., logicalViewEnabled)\ninfra spans → isPrunedPlaceholder rows"]
+        SPANBAR["SpanBarRow.tsx\nGenAISpanIcon reads span.genAIKind\nreact-icons · zero cost when infra"]
+        PANEL["SpanDetailSidePanel/index.tsx\nantd Tabs: Span Details | GenAI Details"]
+        GENAI_DETAIL["SpanDetailSidePanel/GenAISpanDetail.tsx\nmarkdown · pretty JSON · media · token bar"]
+    end
+
+    subgraph SEARCH["SearchTracePage/SearchResults/"]
+        SR_INDEX["index.tsx\ntable/card toggle in AltViewOptions"]
+        TABLE["TracesTable.tsx\nantd Table over IOtelTrace[]\nGenAI indicator column"]
+        CARD["ResultItem.tsx\ngenAIMode badge on existing card"]
+    end
+
+    %% Data flow
+    ATTRS --> ATTRS_CONST
+    ATTRS_CONST --> CLASSIFY
+    CLASSIFY --> SPAN_FAC
+    SPAN_FAC --> TRACE_FAC
+    SPAN_FAC --> IOTEL_SPAN
+    TRACE_FAC --> IOTEL_TRACE
+
+    %% Header wiring
+    IOTEL_TRACE --> HEADER_COMP
+    IOTEL_TRACE --> SETTINGS
+    SETTINGS --> STATE
+    STATE --> ACTION
+
+    %% Timeline wiring
+    ACTION --> VIRT
+    VIRT --> ROWS
+    IOTEL_SPAN --> SPANBAR
+    IOTEL_SPAN --> PANEL
+    PANEL --> GENAI_DETAIL
+
+    %% Search wiring
+    IOTEL_TRACE --> SR_INDEX
+    SR_INDEX --> TABLE
+    SR_INDEX --> CARD
+
+    %% Styling
+    classDef new fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    classDef existing fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef iface fill:#fef9c3,stroke:#ca8a04,color:#713f12
+    classDef io fill:#f3e8ff,stroke:#9333ea,color:#4a1772
+
+    class ATTRS_CONST,CLASSIFY,SPAN_FAC,TRACE_FAC,GENAI_DETAIL,TABLE new
+    class VIRT,ROWS,SPANBAR,PANEL,SR_INDEX,CARD,SETTINGS,STATE,ACTION existing
+    class IOTEL_SPAN,IOTEL_TRACE iface
+    class ATTRS io
+    class HEADER_COMP new

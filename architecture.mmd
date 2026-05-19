@@ -1,0 +1,69 @@
+flowchart TD
+    OP([Operator drops skill.yaml])
+    FW[file-watcher]
+
+    subgraph SKILLS["jaegermcp/internal/skills/"]
+        LOADER["loader.go\nparse YAML · enforce file size limit"]
+        VALIDATOR["validator.go\ncheck allowedTools vs registerTools()"]
+        REGISTRY["registry.go\nin-memory store · last-known-good"]
+        PREV["load failure\nprevious valid set stays active · error logged"]
+    end
+
+    subgraph SERVER["server.go — jaegermcp"]
+        PROMPTS["prompts/list · prompts/get"]
+        MCPTOOLS["MCP tools\nget_critical_path · get_trace_topology\nget_trace_errors · get_span_details · ..."]
+    end
+
+    subgraph UI_LAYER["Jaeger UI"]
+        DROPDOWN["skill dropdown\npopulated via prompts/list"]
+        CHATPANEL["chat panel\ncollapsible reasoning steps · session/update stream"]
+    end
+
+    HANDLER["handler.go\npasses skill_name in NewSession._meta over ACP"]
+
+    subgraph SIDECAR["sidecar.py"]
+        FETCH["call prompts/get"]
+        REPLACE["replace system prompt\nfilter FunctionDeclarations to allowedTools only"]
+        LOOP["ReAct loop"]
+        CIRCUIT["circuit breaker\nreturn partial findings on max iterations"]
+    end
+
+    %% Load path
+    OP --> LOADER
+    FW -->|file change detected| LOADER
+    LOADER --> VALIDATOR
+    VALIDATOR -->|valid| REGISTRY
+    VALIDATOR -->|invalid| PREV
+
+    %% Registry to server and UI notification
+    REGISTRY -->|register skills| PROMPTS
+    REGISTRY -->|notifications/prompts/list_changed| DROPDOWN
+
+    %% UI runtime path
+    DROPDOWN -->|prompts/list| PROMPTS
+    PROMPTS -->|skill list + descriptions| DROPDOWN
+    DROPDOWN -->|user picks skill_name| HANDLER
+    HANDLER -->|ACP WebSocket| FETCH
+
+    %% Sidecar skill resolution
+    FETCH -->|prompts/get| PROMPTS
+    PROMPTS -->|systemPrompt + constraints + allowedTools| REPLACE
+    REPLACE --> LOOP
+
+    %% Agentic loop
+    LOOP -->|tool calls within allowedTools| MCPTOOLS
+    MCPTOOLS -->|dimensional JSON| LOOP
+    LOOP -->|max iterations exceeded| CIRCUIT
+    LOOP -->|stream| CHATPANEL
+    CIRCUIT -->|partial findings| CHATPANEL
+
+    %% Styling
+    classDef new fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    classDef existing fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef decision fill:#fef9c3,stroke:#ca8a04,color:#713f12
+    classDef io fill:#f3e8ff,stroke:#9333ea,color:#4a1772
+
+    class LOADER,VALIDATOR,REGISTRY,PREV,FETCH,REPLACE,LOOP,CIRCUIT new
+    class SERVER,PROMPTS,MCPTOOLS,HANDLER existing
+    class DROPDOWN,CHATPANEL io
+    class OP,FW decision

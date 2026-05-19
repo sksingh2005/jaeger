@@ -1,0 +1,55 @@
+flowchart LR
+    subgraph HEADER["TracePageHeader"]
+        BACK["← Back"]
+        BADGE["Agentic Mode: Full"]
+        GEAR["⚙ Settings\n─────────────\n✓ Show Timeline\n  Show Span in Sidebar\n  Logical View\n─────────────\n  Keyboard Shortcuts"]
+    end
+
+    subgraph MAIN["TraceTimelineViewer (flex row)"]
+        subgraph LEFT["TraceTimelineViewerMain"]
+            subgraph TREE["Timeline rows (VirtualizedTraceView)"]
+                A1["[⊙] invoke_agent ████████"]
+                A2["  ├─ [🧠] chat.completion ███"]
+                A3["  ├─ [🔧] execute_tool ██"]
+                A4["  │     └─ [ ] HTTP POST █"]
+                A5["  └─ [🗄] vector.search ██"]
+            end
+            subgraph LOGICAL["Logical View ON"]
+                B1["[⊙] invoke_agent ████████"]
+                B2["  ├─ [🧠] chat.completion ███"]
+                B3["  ├─ [🔧] execute_tool ██"]
+                B4["  │     └─ (1 infra span hidden)"]
+                B5["  └─ [🗄] vector.search ██"]
+            end
+        end
+
+        DIVIDER["VerticalResizer\n(drag to resize)"]
+
+        subgraph PANEL["SpanDetailSidePanel (ADR-0006)"]
+            TABS["[ Span Details ]  [ GenAI Details ]"]
+            subgraph GENAI["GenAISpanDetail.tsx"]
+                P1["── Prompt (react-markdown) ──\nrole: user\n'Find relevant documents...'"]
+                P2["── Completion ──\n'Based on the retrieved context...'"]
+                P3["── Tool Input (JSON) ──\n{ query: 'payment errors' }"]
+                P4["── Token Usage ──\nIn: 1,024  Out: 312  gpt-4o-mini"]
+            end
+        end
+    end
+
+    subgraph SEARCH["SearchResults (Search Page)"]
+        TOGGLE["AltViewOptions: [ Cards | Table ]"]
+        subgraph TABLEVIEW["TracesTable.tsx"]
+            TH["Trace ID | Root Service | Duration | Spans | Errors | GenAI"]
+            TR1["8f1c...  | payment-svc  |  420ms   |  12   |   0    |  ●   "]
+            TR2["a3d7...  | order-svc    |  88ms    |   6   |   1    |      "]
+        end
+    end
+
+    %% Styling
+    classDef new fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    classDef existing fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef icon fill:#fef9c3,stroke:#ca8a04,color:#713f12
+
+    class GENAI,TABLEVIEW,BADGE new
+    class TREE,PANEL,TABS,DIVIDER,TOGGLE existing
+    class LOGICAL,GEAR icon
